@@ -1,3 +1,9 @@
-aiogram
+APScheduler~=3.9.1
+aiogram-dialog~=2.0.0b3
+aiogram~=3.0.0b3
+aiohttp~=3.8.1
 aioredis
-asyncpg
+asyncpg~=0.25.0
+pydantic[dotenv]~=1.9.2
+pydantic~=1.9.1
+redis
