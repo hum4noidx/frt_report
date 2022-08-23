@@ -1,34 +1,37 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Dispatcher, Router, F
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from asyncpg import create_pool
+from magic_filter import F
 
 from tgbot.configreader import config
 from tgbot.dialogs.misc.setup import setup_dialogs
-from tgbot.dialogs.user.user_main import register_handlers_user
+from tgbot.dialogs.user.user_main import register_handlers_user, schedule_jobs
 from tgbot.handlers.group import register_handlers_group
 from tgbot.middlewares.db import DbSessionMiddleware
 
+if config.environment == 'PROD':
+    logging.basicConfig(filename='bot_webhook.log',
+                        filemode='a',
+                        level=logging.DEBUG,
+                        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+                        )
+
 
 async def main():
-    # Logging to stdout
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    )
     logging.warning('Starting bot')
     # Creating DB connections pool
     db_pool = await create_pool(config.postgres_dsn)
 
     # Creating bot and its dispatcher
     bot = Bot(token=config.bot_token, parse_mode="HTML")
-    # bot['db'] = async_sessionmaker
     if config.custom_bot_api:
         bot.session.api = TelegramAPIServer.from_base(config.custom_bot_api, is_local=True)
 
@@ -36,10 +39,14 @@ async def main():
     if config.bot_fsm_storage == "memory":
         dp = Dispatcher(storage=MemoryStorage())
     else:
-        dp = Dispatcher(storage=RedisStorage.from_url(config.redis_dsn))
+        dp = Dispatcher(storage=RedisStorage.from_url(config.redis_dsn,
+                                                      key_builder=DefaultKeyBuilder(with_destiny=True)))
 
     # Allow interaction in private chats (not groups or channels) only
-    # dp.message.filter(F.chat.type == "private")
+    dp.message.filter(F.chat.type == "private")
+
+    scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
+    scheduler.start()
 
     # Register middlewares
     dp.message.middleware(DbSessionMiddleware(db_pool))
@@ -56,10 +63,12 @@ async def main():
     main_router.include_router(user_router)
     main_router.include_router(admin_router)
     main_router.include_router(group_router)
+    group_router.message.filter(F.chat.type == "supergroup")
 
     register_handlers_user(user_router)
     register_handlers_group(group_router)
     setup_dialogs(dp)
+    schedule_jobs(dp, scheduler)
 
     try:
 

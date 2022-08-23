@@ -3,10 +3,9 @@ from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION
 
 
 async def on_user_join(event: types.ChatMemberUpdated, bot: Bot):
-    print(event)
     await bot.send_message(chat_id=event.chat.id,
-                           text=f"Привет, {event.from_user.full_name}!\n"
-                                f"Ознакомься с <a href='https://telegra.ph/FAQ--Fast-River-Tinkoff-08-19'>правилами</a>")
+                           text=f"Привет, {event.old_chat_member.user.full_name}!\n"
+                                f"Ознакомься с <a href='#'>правилами</a>")
 
 
 def register_handlers_group(router: Router):

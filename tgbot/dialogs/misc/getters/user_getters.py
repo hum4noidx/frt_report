@@ -16,7 +16,8 @@ class UserGetter:
         return {
             'user_id': user_id,
             'tinkoff_id': tinkoff_id,
-            'user_schedule': schedule
+            'user_schedule': schedule,
+            'real_name': data['real_name'],
 
         }
 
